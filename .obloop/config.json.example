@@ -1,0 +1,11 @@
+{
+  "agents": ["chaos", "developer"],
+  "prompt": "Execute your current task.",
+  "loop": {
+    "max_steps": 20,
+    "timeout": "60m",
+    "stop_phrase": "<promise>DONE</promise>",
+    "stop_mode": "suffix",
+    "delay": "5s"
+  }
+}
