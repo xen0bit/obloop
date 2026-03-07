@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "OpenCode plugin: run a sequence of agents (e.g. chaos → developer) as separate sessions, triggered by /obloop",
   "type": "module",
-  "main": "src/plugin.ts",
+  "main": "obloop.ts",
   "scripts": {
     "typecheck": "tsc --noEmit"
   },

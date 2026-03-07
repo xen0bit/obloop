@@ -11,8 +11,17 @@ Inspired by [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent)�
 
 ## Install
 
-1. Clone or link this repo into your OpenCode plugin directory:
-   - **Project:** `.opencode/plugins/` (e.g. copy or symlink the plugin file)
+**Using Make (Linux/macOS, or Git Bash/WSL on Windows):**
+
+```bash
+make install   # install plugin + skills to ~/.config/opencode (or %APPDATA%\opencode on Windows)
+make uninstall # remove them
+```
+
+**Manual:**
+
+1. Clone or link this repo into your OpenCode plugin directory, or point OpenCode at the entry file `obloop.ts`:
+   - **Project:** `.opencode/plugins/` (e.g. copy or symlink `obloop.ts`)
    - **Global:** `~/.config/opencode/plugins/`
 
 2. Ensure the **obloop skill** is available so `/obloop` works:
@@ -91,9 +100,20 @@ Configure agents and the prompt sent to each in either:
 
 4. Optional toasts (if supported) indicate when each agent’s session starts and finishes.
 
+## Troubleshooting: `/obloop` not in the TUI
+
+- **Plugin loading:** OpenCode only auto-loads plugin **files that are directly inside** the plugins directory. `make install` now installs `obloop.ts` and `src/` at the top level of `~/.config/opencode/plugins/` so the plugin is loaded without adding it to your config.
+- **Slash command:** `/obloop` comes from the **skill** (`.opencode/skills/obloop/`). For it to appear:
+  - If you run OpenCode from the obloop repo, the project’s `.opencode/skills/` is used, so `/obloop` should show up.
+  - If you run OpenCode from another project, use `make install` so skills are copied to `~/.config/opencode/skills/` (global), or copy `.opencode/skills/obloop` and `obloop-ack` into that project’s `.opencode/skills/`.
+- After changing plugins or skills, restart OpenCode.
+- **Debug:** Run `opencode --print-logs`, then run `/obloop`. You should see:
+  - At startup: `Obloop plugin loaded` (confirms the plugin is loaded).
+  - When you run `/obloop`: either `Obloop: command.execute.before, starting loop` or `Obloop: tool.execute.before (skill), starting loop`. If you see neither, the slash command isn’t firing the hooks we use.
+
 ## How it works
 
-- **Trigger:** When you run `/obloop`, the OpenCode **skill** tool is invoked. The plugin’s `tool.execute.before` hook detects it and starts the loop (without awaiting) and rewrites the skill to an ack message so the chat shows “Obloop started …”.
+- **Trigger:** When you run `/obloop`, OpenCode runs the command and/or invokes the **skill** tool. The plugin hooks **`command.execute.before`** (slash command) and **`tool.execute.before`** (skill tool) per the [OpenCode plugin API](https://opencode.ai/docs/plugins); when either matches “obloop”, it starts the loop and shows “Obloop started …”.
 - **Loop:** For each agent in config, the plugin uses the OpenCode **client** (same server as the TUI) to:
   1. Create a **new session** (no parent, no prior context – agent has no visibility to previous sessions).
   2. Send a single prompt with that **agent** set; the response **streams** to the UI.
