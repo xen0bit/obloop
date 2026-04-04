@@ -11,7 +11,7 @@ endif
 REPO_ROOT  := $(CURDIR)
 LOCAL_DIR  := $(REPO_ROOT)/.opencode
 
-.PHONY: all setup build test install clean
+.PHONY: all setup build test install uninstall clean
 
 all: setup
 
@@ -66,25 +66,40 @@ SKILLS_DEST := $(GLOBAL_DIR)/skills
 
 install: node_modules
 	@echo "Installing to $(GLOBAL_DIR) ..."
-	@# Plugin
+	@# Plugin – remove and re-copy so stale source files don't accumulate
+	@rm -rf $(PLUGIN_DEST)
 	@mkdir -p $(PLUGIN_DEST)
-	@cp -r $(REPO_ROOT)/src           $(PLUGIN_DEST)/
-	@cp    $(REPO_ROOT)/plugin.ts      $(PLUGIN_DEST)/
-	@cp    $(REPO_ROOT)/package.json   $(PLUGIN_DEST)/
-	@cp    $(REPO_ROOT)/tsconfig.json  $(PLUGIN_DEST)/
+	@cp -r $(REPO_ROOT)/src          $(PLUGIN_DEST)/
+	@cp    $(REPO_ROOT)/plugin.ts    $(PLUGIN_DEST)/
+	@cp    $(REPO_ROOT)/package.json $(PLUGIN_DEST)/
+	@cp    $(REPO_ROOT)/tsconfig.json $(PLUGIN_DEST)/
 	@cd $(PLUGIN_DEST) && bun install --frozen-lockfile 2>/dev/null || bun install
 	@echo "  plugin  -> $(PLUGIN_DEST)"
-	@# Agents
+	@# Agents – merge into shared directory, overwrite our files only
 	@mkdir -p $(AGENTS_DEST)
 	@cp $(LOCAL_DIR)/agents/chaos.md     $(AGENTS_DEST)/
 	@cp $(LOCAL_DIR)/agents/developer.md $(AGENTS_DEST)/
 	@echo "  agents  -> $(AGENTS_DEST)"
-	@# Skills
+	@# Skills – merge into shared directory, overwrite our subdirs only
 	@mkdir -p $(SKILLS_DEST)/obloop $(SKILLS_DEST)/obloop-ack
 	@cp $(LOCAL_DIR)/skills/obloop/SKILL.md     $(SKILLS_DEST)/obloop/
 	@cp $(LOCAL_DIR)/skills/obloop-ack/SKILL.md $(SKILLS_DEST)/obloop-ack/
 	@echo "  skills  -> $(SKILLS_DEST)"
 	@echo "Global install complete."
+
+# ---------------------------------------------------------------------------
+# Global uninstall – removes only what install placed; leaves everything else
+# ---------------------------------------------------------------------------
+
+uninstall:
+	@echo "Uninstalling from $(GLOBAL_DIR) ..."
+	@rm -rf  $(PLUGIN_DEST)
+	@echo "  removed $(PLUGIN_DEST)"
+	@rm -f   $(AGENTS_DEST)/chaos.md $(AGENTS_DEST)/developer.md
+	@echo "  removed agents from $(AGENTS_DEST)"
+	@rm -rf  $(SKILLS_DEST)/obloop $(SKILLS_DEST)/obloop-ack
+	@echo "  removed skills from $(SKILLS_DEST)"
+	@echo "Global uninstall complete."
 
 # ---------------------------------------------------------------------------
 # Clean – removes the local plugin symlink (agents/skills stay; they're
