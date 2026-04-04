@@ -13,6 +13,8 @@ export type ObloopPlugin = (
 }>
 
 export const obloopPlugin: ObloopPlugin = async (ctx) => {
+  let loopRunning = false
+
   return {
     "tool.execute.before": async (input, output) => {
       if (input.tool !== "skill") return
@@ -28,6 +30,15 @@ export const obloopPlugin: ObloopPlugin = async (ctx) => {
       const directory = typeof ctx.directory === "string" ? ctx.directory : ""
       if (!directory) return
 
+      if (loopRunning) {
+        output.args = {
+          ...output.args,
+          name: OBLOOP_ACK_SKILL,
+          arguments: "Obloop is already running.",
+        } as Record<string, unknown>
+        return
+      }
+
       const promptFromArgs = rawName
         .replace(/^\/?(obloop)\s*/i, "")
         .trim()
@@ -36,9 +47,12 @@ export const obloopPlugin: ObloopPlugin = async (ctx) => {
       const config = loadObloopConfig(directory)
       const agents = config.agents.join(" → ")
 
+      loopRunning = true
       runLoop(ctx, {
         directory,
         promptOverride: promptFromArgs || undefined,
+      }).finally(() => {
+        loopRunning = false
       }).catch((err) => {
         ctx.client.app?.log?.({
           body: {
