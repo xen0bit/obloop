@@ -27,24 +27,32 @@ function matchesStopPhrase(content: string, phrase: string, mode: StopMode): boo
   return false
 }
 
+type Client = PluginContext["client"]
+type Level = "debug" | "info" | "warn" | "error"
 type MessagePart = { type?: string; text?: string }
 type SessionMessage = { info?: { role?: string }; parts?: MessagePart[] }
 
-async function getLastAssistantText(
-  client: PluginContext["client"],
-  sessionId: string,
-): Promise<string> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const appLog = (client: Client, level: Level, message: string, extra?: Record<string, unknown>) =>
+  client.app.log({ body: { service: "obloop", level, message, extra } } as any).catch(() => {})
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const tuiToast = (client: Client, message: string, variant: "info" | "success" | "warning" | "error") =>
+  client.tui.showToast({ body: { message, variant } } as any).catch(() => {})
+
+async function getLastAssistantText(client: Client, sessionId: string): Promise<string> {
   try {
-    const res = await client.session.messages({ path: { id: sessionId } })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await client.session.messages({ path: { id: sessionId } } as any)
     const list: SessionMessage[] = Array.isArray(res.data) ? res.data as SessionMessage[] : []
     for (let i = list.length - 1; i >= 0; i--) {
       const msg = list[i]
       if (msg?.info?.role === "assistant") {
         const parts = msg.parts ?? []
-        const texts = parts
+        return parts
           .filter((p: MessagePart) => p?.type === "text" && p?.text != null)
-          .map((p: MessagePart) => (p.text as string))
-        return texts.join("\n")
+          .map((p: MessagePart) => p.text as string)
+          .join("\n")
       }
     }
   } catch {
@@ -58,10 +66,7 @@ async function getLastAssistantText(
  * Stops when: stop_phrase found in assistant output, max_steps reached, or timeout.
  * Optional delay between iterations. Response streams to the UI.
  */
-export async function runLoop(
-  ctx: PluginContext,
-  options: RunLoopOptions,
-): Promise<void> {
+export async function runLoop(ctx: PluginContext, options: RunLoopOptions): Promise<void> {
   const base = loadObloopConfig(options.directory)
   const config: ObloopConfig = {
     ...base,
@@ -81,37 +86,15 @@ export async function runLoop(
   let step = 0
   let stoppedByPhrase = false
 
-  try {
-    await client.app?.log?.({
-      body: {
-        service: "obloop",
-        level: "info",
-        message: "Obloop started",
-        extra: {
-          agents,
-          prompt: prompt.slice(0, 80),
-          loop: {
-            max_steps: loop.max_steps,
-            timeout_ms: loop.timeout_ms,
-            stop_phrase: loop.stop_phrase || "(none)",
-          },
-        },
-      },
-    })
-  } catch {
-    // ignore
-  }
+  await appLog(client, "info", "Obloop started", {
+    agents,
+    prompt: prompt.slice(0, 80),
+    loop: { max_steps: loop.max_steps, timeout_ms: loop.timeout_ms, stop_phrase: loop.stop_phrase || "(none)" },
+  })
 
   outer: while (step < loop.max_steps) {
     if (loop.timeout_ms > 0 && Date.now() - startTime >= loop.timeout_ms) {
-      await client.app?.log?.({
-        body: {
-          service: "obloop",
-          level: "info",
-          message: "Obloop stopped: timeout",
-          extra: { step, elapsed_ms: Date.now() - startTime },
-        },
-      })
+      await appLog(client, "info", "Obloop stopped: timeout", { step, elapsed_ms: Date.now() - startTime })
       break
     }
 
@@ -124,59 +107,27 @@ export async function runLoop(
       let sessionId = ""
 
       try {
-        const session = await client.session.create({
-          body: { title },
-        })
-        const sid = session.data?.id ?? (session as { id?: string }).id
-        sessionId = sid ?? ""
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const session = await client.session.create({ body: { title } } as any)
+        sessionId = (session.data as { id?: string } | undefined)?.id ?? ""
         if (!sessionId) {
-          await client.app?.log?.({
-            body: {
-              service: "obloop",
-              level: "error",
-              message: "Obloop: session.create did not return an id",
-              extra: { agent },
-            },
-          })
+          await appLog(client, "error", "Obloop: session.create did not return an id", { agent })
           break outer
         }
       } catch (err) {
-        await client.app?.log?.({
-          body: {
-            service: "obloop",
-            level: "error",
-            message: "Obloop: failed to create session",
-            extra: { agent, error: String(err) },
-          },
-        })
+        await appLog(client, "error", "Obloop: failed to create session", { agent, error: String(err) })
         break outer
       }
 
-      try {
-        await client.tui?.showToast?.({
-          body: { message: `Obloop: starting ${agent} (step ${step + 1})`, variant: "info" },
-        })
-      } catch {
-        // ignore
-      }
+      tuiToast(client, `Obloop: starting ${agent} (step ${step + 1})`, "info")
 
       try {
         await client.session.prompt({
-          path: { id: sessionId },
-          body: {
-            agent,
-            parts: [{ type: "text", text: prompt }],
-          },
-        })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          path: { id: sessionId }, body: { agent, parts: [{ type: "text", text: prompt }] },
+        } as any)
       } catch (err) {
-        await client.app?.log?.({
-          body: {
-            service: "obloop",
-            level: "error",
-            message: "Obloop: failed to send prompt",
-            extra: { agent, sessionId, error: String(err) },
-          },
-        })
+        await appLog(client, "error", "Obloop: failed to send prompt", { agent, sessionId, error: String(err) })
         break outer
       }
 
@@ -184,33 +135,14 @@ export async function runLoop(
         const text = await getLastAssistantText(client, sessionId)
         if (matchesStopPhrase(text, loop.stop_phrase, loop.stop_mode)) {
           stoppedByPhrase = true
-          await client.app?.log?.({
-            body: {
-              service: "obloop",
-              level: "info",
-              message: "Obloop stopped: stop phrase matched",
-              extra: { step: step + 1, stop_phrase: loop.stop_phrase },
-            },
-          })
-          try {
-            await client.tui?.showToast?.({
-              body: { message: "Obloop: done (stop phrase matched)", variant: "success" },
-            })
-          } catch {
-            // ignore
-          }
+          await appLog(client, "info", "Obloop stopped: stop phrase matched", { step: step + 1, stop_phrase: loop.stop_phrase })
+          tuiToast(client, "Obloop: done (stop phrase matched)", "success")
           break outer
         }
       }
 
       step += 1
-      try {
-        await client.tui?.showToast?.({
-          body: { message: `Obloop: ${agent} done`, variant: "success" },
-        })
-      } catch {
-        // ignore
-      }
+      tuiToast(client, `Obloop: ${agent} done`, "success")
 
       if (loop.delay_ms > 0) {
         await new Promise((r) => setTimeout(r, loop.delay_ms))
@@ -218,16 +150,5 @@ export async function runLoop(
     }
   }
 
-  try {
-    await client.app?.log?.({
-      body: {
-        service: "obloop",
-        level: "info",
-        message: "Obloop finished",
-        extra: { agents, step, stoppedByPhrase },
-      },
-    })
-  } catch {
-    // ignore
-  }
+  await appLog(client, "info", "Obloop finished", { agents, step, stoppedByPhrase })
 }

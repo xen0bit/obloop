@@ -39,46 +39,58 @@ test: build
 # ---------------------------------------------------------------------------
 # Local setup – makes `opencode` in this repo use the plugin + agents
 #
-# - .opencode/agents/  already present in the repo (chaos.md, developer.md)
+# OpenCode scans plugins/*.{ts,js} (flat files only, not subdirectories).
+# We symlink plugin.ts directly as obloop.ts so Bun resolves its relative
+# imports from the actual file location (the repo root).
+#
+# - .opencode/agents/  already present in the repo (backward.md, forward.md)
 # - .opencode/skills/  already present in the repo (obloop, obloop-ack)
-# - .opencode/plugins/obloop  → symlink to repo root so edits are live
+# - .opencode/plugins/obloop.ts  → symlink to repo root plugin.ts
 # ---------------------------------------------------------------------------
 
 setup: node_modules
 	@mkdir -p $(LOCAL_DIR)/plugins
-	@if [ -L "$(LOCAL_DIR)/plugins/obloop" ]; then \
+	@if [ -L "$(LOCAL_DIR)/plugins/obloop.ts" ]; then \
 		echo "plugin symlink already exists, skipping"; \
-	elif [ -e "$(LOCAL_DIR)/plugins/obloop" ]; then \
-		echo "ERROR: $(LOCAL_DIR)/plugins/obloop exists and is not a symlink – remove it first" >&2; exit 1; \
+	elif [ -e "$(LOCAL_DIR)/plugins/obloop.ts" ]; then \
+		echo "ERROR: $(LOCAL_DIR)/plugins/obloop.ts exists and is not a symlink – remove it first" >&2; exit 1; \
 	else \
-		ln -s $(REPO_ROOT) $(LOCAL_DIR)/plugins/obloop; \
-		echo "Created $(LOCAL_DIR)/plugins/obloop -> $(REPO_ROOT)"; \
+		ln -s $(REPO_ROOT)/plugin.ts $(LOCAL_DIR)/plugins/obloop.ts; \
+		echo "Created $(LOCAL_DIR)/plugins/obloop.ts -> $(REPO_ROOT)/plugin.ts"; \
+	fi
+	@# Clean up any old directory-style symlink from previous installs
+	@if [ -L "$(LOCAL_DIR)/plugins/obloop" ] || [ -d "$(LOCAL_DIR)/plugins/obloop" ]; then \
+		rm -rf "$(LOCAL_DIR)/plugins/obloop"; \
+		echo "Removed old directory-style plugin link"; \
 	fi
 	@echo "Local setup complete. Run 'opencode' in this directory to use obloop."
 
 # ---------------------------------------------------------------------------
-# Global install – copies plugin, agents, and skills to the OS config dir
+# Global install – copies plugin source + entry file to the OS config dir
+#
+# OpenCode scans plugins/*.{ts,js}. We install:
+#   plugins/obloop.ts        – entry file (re-exports from ./obloop/src/plugin.js)
+#   plugins/obloop/src/      – source files (no node_modules needed; no runtime deps)
 # ---------------------------------------------------------------------------
 
-PLUGIN_DEST := $(GLOBAL_DIR)/plugins/obloop
-AGENTS_DEST := $(GLOBAL_DIR)/agents
-SKILLS_DEST := $(GLOBAL_DIR)/skills
+PLUGIN_SRC_DEST := $(GLOBAL_DIR)/plugins/obloop
+PLUGIN_ENTRY    := $(GLOBAL_DIR)/plugins/obloop.ts
+AGENTS_DEST     := $(GLOBAL_DIR)/agents
+SKILLS_DEST     := $(GLOBAL_DIR)/skills
 
 install: node_modules
 	@echo "Installing to $(GLOBAL_DIR) ..."
-	@# Plugin – remove and re-copy so stale source files don't accumulate
-	@rm -rf $(PLUGIN_DEST)
-	@mkdir -p $(PLUGIN_DEST)
-	@cp -r $(REPO_ROOT)/src          $(PLUGIN_DEST)/
-	@cp    $(REPO_ROOT)/plugin.ts    $(PLUGIN_DEST)/
-	@cp    $(REPO_ROOT)/package.json $(PLUGIN_DEST)/
-	@cp    $(REPO_ROOT)/tsconfig.json $(PLUGIN_DEST)/
-	@cd $(PLUGIN_DEST) && bun install --frozen-lockfile 2>/dev/null || bun install
-	@echo "  plugin  -> $(PLUGIN_DEST)"
+	@# Plugin source – remove and re-copy so stale files don't accumulate
+	@rm -rf $(PLUGIN_SRC_DEST)
+	@mkdir -p $(PLUGIN_SRC_DEST)
+	@cp -r $(REPO_ROOT)/src $(PLUGIN_SRC_DEST)/
+	@# Entry file – re-exports from the source directory
+	@printf 'export { default } from "./obloop/src/plugin.js"\n' > $(PLUGIN_ENTRY)
+	@echo "  plugin  -> $(PLUGIN_SRC_DEST)/ + $(PLUGIN_ENTRY)"
 	@# Agents – merge into shared directory, overwrite our files only
 	@mkdir -p $(AGENTS_DEST)
-	@cp $(LOCAL_DIR)/agents/chaos.md     $(AGENTS_DEST)/
-	@cp $(LOCAL_DIR)/agents/developer.md $(AGENTS_DEST)/
+	@cp $(LOCAL_DIR)/agents/backward.md $(AGENTS_DEST)/
+	@cp $(LOCAL_DIR)/agents/forward.md  $(AGENTS_DEST)/
 	@echo "  agents  -> $(AGENTS_DEST)"
 	@# Skills – merge into shared directory, overwrite our subdirs only
 	@mkdir -p $(SKILLS_DEST)/obloop $(SKILLS_DEST)/obloop-ack
@@ -93,9 +105,10 @@ install: node_modules
 
 uninstall:
 	@echo "Uninstalling from $(GLOBAL_DIR) ..."
-	@rm -rf  $(PLUGIN_DEST)
-	@echo "  removed $(PLUGIN_DEST)"
-	@rm -f   $(AGENTS_DEST)/chaos.md $(AGENTS_DEST)/developer.md
+	@rm -rf  $(PLUGIN_SRC_DEST)
+	@rm -f   $(PLUGIN_ENTRY)
+	@echo "  removed $(PLUGIN_SRC_DEST) and $(PLUGIN_ENTRY)"
+	@rm -f   $(AGENTS_DEST)/backward.md $(AGENTS_DEST)/forward.md
 	@echo "  removed agents from $(AGENTS_DEST)"
 	@rm -rf  $(SKILLS_DEST)/obloop $(SKILLS_DEST)/obloop-ack
 	@echo "  removed skills from $(SKILLS_DEST)"
@@ -107,5 +120,5 @@ uninstall:
 # ---------------------------------------------------------------------------
 
 clean:
-	@rm -f $(LOCAL_DIR)/plugins/obloop
+	@rm -f $(LOCAL_DIR)/plugins/obloop.ts
 	@echo "Removed local plugin symlink."
