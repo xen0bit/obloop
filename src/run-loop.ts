@@ -1,7 +1,17 @@
+import { readFileSync } from "fs"
+import { join } from "path"
 import type { ObloopConfig, LoopConfig, RawLoopConfig } from "./config.js"
 import { loadObloopConfig, normalizeLoop } from "./config.js"
 import type { PluginContext } from "./types.js"
 import type { StopMode } from "./constants.js"
+
+function readTaskMd(directory: string): string {
+  try {
+    return readFileSync(join(directory, "task.md"), "utf8").trim()
+  } catch {
+    return ""
+  }
+}
 
 export type RunLoopOptions = {
   directory: string
@@ -59,8 +69,8 @@ export async function runLoop(
     agents: options.configOverride?.agents?.length ? options.configOverride.agents : base.agents,
     prompt: options.promptOverride ?? options.configOverride?.prompt ?? base.prompt,
   }
-  const prompt: string = config.prompt ?? ""
-  const agents: string[] = config.agents?.length ? config.agents : ["chaos", "developer"]
+  const prompt: string = config.prompt || readTaskMd(options.directory)
+  const agents: string[] = config.agents?.length ? config.agents : ["backward", "forward"]
   const loop: LoopConfig =
     options.configOverride?.loop != null
       ? normalizeLoop(options.configOverride.loop as RawLoopConfig)

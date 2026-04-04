@@ -1,6 +1,6 @@
 # obloop
 
-OpenCode plugin: run a **sequence of agents** (e.g. chaos → developer) as separate sessions, one after the other. Each agent runs in a **fresh session** with no visibility to any parent or previous session; chaos and developer maintain their **own** state. When one session finishes, the next agent’s session starts. Sessions stream directly to the interface; all appear in the same OpenCode instance.
+OpenCode plugin: run a **sequence of agents** (e.g. backward → forward) as separate sessions, one after the other. Each agent runs in a **fresh session** with no visibility to any parent or previous session; backward and forward maintain their **own** state. When one session finishes, the next agent’s session starts. Sessions stream directly to the interface; all appear in the same OpenCode instance.
 
 Inspired by [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent)’s ralph-loop; unlike ralph-loop, obloop uses **multiple sessions** (one per agent), each starting fresh. **Obloop does not preserve or pass state** between agents.
 
@@ -32,7 +32,7 @@ Configure agents and the prompt sent to each in either:
 {
   "plugin": ["obloop"],
   "obloop": {
-    "agents": ["chaos", "developer"],
+    "agents": ["backward", "forward"],
     "prompt": "Execute your current task.",
     "loop": {
       "max_steps": 20,
@@ -49,7 +49,7 @@ Configure agents and the prompt sent to each in either:
 
 ```json
 {
-  "agents": ["chaos", "developer"],
+  "agents": ["backward", "forward"],
   "prompt": "Execute your current task.",
   "loop": {
     "max_steps": 20,
@@ -85,7 +85,7 @@ Configure agents and the prompt sent to each in either:
    /obloop "Read state and do one step"
    ```
 
-2. The plugin starts the loop in the background and you get a short “Obloop started. Agents: chaos → developer. …” message.
+2. The plugin starts the loop in the background and you get a short “Obloop started. Agents: backward → forward. …” message.
 
 3. New sessions appear in the session list, one per agent, in order. Each session is **fresh** (no parent, no prior context). Agent output **streams directly** to the interface; switch to the new session to watch it live. When a session finishes, the next agent’s session is created.
 
@@ -99,7 +99,7 @@ Configure agents and the prompt sent to each in either:
   2. Send a single prompt with that **agent** set; the response **streams** to the UI.
   3. When the prompt completes, create the next session and repeat.
 
-Obloop does not preserve or pass state; chaos and developer maintain their own state. There are no separate `opencode run` processes; everything runs in the same OpenCode instance.
+Obloop does not preserve or pass state; backward and forward maintain their own state. There are no separate `opencode run` processes; everything runs in the same OpenCode instance.
 
 ## Approach
 

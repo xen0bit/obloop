@@ -1,6 +1,6 @@
 export const OBLOOP_COMMAND_NAMES = ["obloop", "/obloop"] as const
 export const OBLOOP_ACK_SKILL = "/obloop-ack"
-export const DEFAULT_AGENTS = ["chaos", "developer"]
+export const DEFAULT_AGENTS = ["backward", "forward"]
 export const DEFAULT_PROMPT = ""
 export const CONFIG_DIR = ".obloop"
 export const CONFIG_FILE = "config.json"
