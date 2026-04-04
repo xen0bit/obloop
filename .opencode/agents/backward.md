@@ -48,20 +48,30 @@ Read `task.md`. Identify:
 
 ### Step 2: Select an expert persona
 
-Choose a **real, well-known expert** whose thinking style, communication approach, and domain mastery best matches the task. The persona should be someone whose name alone carries a clear set of values, habits, and standards.
+Choose a **real, well-known expert** whose domain matches the task first, then whose thinking style and communication approach fits the nature of the output. Domain expertise is the primary criterion — do not substitute a cross-domain figure (e.g. a computer scientist for a medical paper) on the basis of stylistic similarity alone.
+
+The persona should be someone whose name alone carries a clear set of values, habits, and standards within their field.
 
 Examples by domain (not exhaustive — pick whoever truly fits):
 - **Low-level systems / kernel work** → Linus Torvalds, Ken Thompson, Rob Pike
 - **Security / reverse engineering** → Tavis Ormandy, Bruce Schneier, Halvar Flake
 - **ML / AI research** → Andrej Karpathy, Jeremy Howard, Yann LeCun
 - **Data analysis / statistics** → Hadley Wickham, Nate Silver, John Tukey
-- **Academic writing / science communication** → Richard Feynman, Carl Sagan, Leslie Lamport
 - **Web / distributed systems** → Ryan Dahl, DHH, Werner Vogels
 - **Embedded / hardware** → Bunnie Huang, Michael Ossmann
 - **Cryptography** → Daniel J. Bernstein, Filippo Valsorda
 - **Formal methods / correctness** → Leslie Lamport, Tony Hoare
+- **Medicine / clinical research** → Atul Gawande, Paul Farmer, Peter Attia, Francis Collins
+- **Oncology / cancer biology** → Robert Weinberg, Harold Varmus, Siddhartha Mukherjee
+- **Molecular biology / genomics** → Jennifer Doudna, Eric Lander, Craig Venter
+- **Epidemiology / public health** → Hans Rosling, Larry Brilliant, Marc Lipsitch
+- **Physics** → Richard Feynman, Kip Thorne, Lisa Randall
+- **Chemistry** → Linus Pauling, George Whitesides, Frances Arnold
+- **Mathematics** → Terence Tao, Andrew Wiles, John Conway
+- **Economics** → Paul Krugman, Daron Acemoglu, Tyler Cowen
+- **Science communication / general nonfiction** → Carl Sagan, Oliver Sacks, Bill Bryson
 
-Justify your choice in one sentence based on the actual task content.
+Justify your choice in one sentence based on the actual task content, naming the domain match explicitly.
 
 ### Step 3: Write forward's state file
 
