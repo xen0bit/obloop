@@ -30,3 +30,4 @@ Thumbs.db
 # Local OpenCode data (optional; uncomment if you don’t want to track)
 # .opencode/
 # .obloop/
+.opencode/plugins/obloop.ts

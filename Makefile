@@ -1,69 +1,124 @@
-# obloop Makefile — OS-detected paths, make / install / uninstall
-# On Windows, run from Git Bash or WSL for best compatibility (uses sh + cp/rm).
+UNAME := $(shell uname -s)
 
-# OS detection (Linux, Darwin/macOS, Windows_NT)
-UNAME_S := $(shell uname -s 2>/dev/null || echo Unknown)
-ifeq ($(OS),Windows_NT)
-  DETECTED_OS := Windows
-else ifeq ($(UNAME_S),Linux)
-  DETECTED_OS := Linux
-else ifeq ($(UNAME_S),Darwin)
-  DETECTED_OS := Darwin
+ifeq ($(UNAME),Darwin)
+  GLOBAL_DIR := $(HOME)/.config/opencode
+else ifeq ($(UNAME),Linux)
+  GLOBAL_DIR := $(HOME)/.config/opencode
 else
-  DETECTED_OS := Unknown
+  GLOBAL_DIR := $(APPDATA)/opencode
 endif
 
-# OpenCode config dir by OS
-# Linux/Darwin: ~/.config/opencode  |  Windows: %APPDATA%\opencode
-ifeq ($(DETECTED_OS),Windows)
-  OPENCODE_HOME ?= $(USERPROFILE)/AppData/Roaming/opencode
-else
-  OPENCODE_HOME ?= $(HOME)/.config/opencode
-endif
+REPO_ROOT  := $(CURDIR)
+LOCAL_DIR  := $(REPO_ROOT)/.opencode
 
-PLUGINS_DIR := $(OPENCODE_HOME)/plugins
-SKILLS_DIR  := $(OPENCODE_HOME)/skills
-# Install entry point at top level (OpenCode only auto-loads files directly in plugins/)
-INSTALL_ENTRY := $(PLUGINS_DIR)/obloop.ts
-INSTALL_SRC   := $(PLUGINS_DIR)/src
+.PHONY: all setup build test install uninstall clean
 
-.PHONY: all install uninstall help
+all: setup
 
-# Default: run typecheck
-all:
+# ---------------------------------------------------------------------------
+# Dependency installation
+# ---------------------------------------------------------------------------
+
+node_modules: package.json
+	bun install
+	@touch node_modules
+
+# ---------------------------------------------------------------------------
+# Build / type-check
+# ---------------------------------------------------------------------------
+
+build: node_modules
 	bun run typecheck
 
-help:
-	@echo "obloop Makefile (detected OS: $(DETECTED_OS), OPENCODE_HOME: $(OPENCODE_HOME))"
-	@echo ""
-	@echo "  make          Run typecheck"
-	@echo "  make install  Install plugin (obloop.ts + src/) and skills into $(PLUGINS_DIR) and $(SKILLS_DIR)"
-	@echo "  make uninstall Remove installed plugin and skills"
+# ---------------------------------------------------------------------------
+# Test (type-check is the full static verification available)
+# ---------------------------------------------------------------------------
 
-install: install-plugin install-skills
-	@echo "Installed obloop to $(PLUGINS_DIR) (obloop.ts + src/) and skills to $(SKILLS_DIR)"
+test: build
 
-install-plugin:
-	@mkdir -p "$(PLUGINS_DIR)" "$(INSTALL_SRC)"
-	@cp -f obloop.ts "$(INSTALL_ENTRY)"
-	@cp -f src/*.ts "$(INSTALL_SRC)/"
-	@echo "Plugin entry: $(INSTALL_ENTRY) (OpenCode loads files directly in plugins/)"
-	@if [ -f package.json ]; then cp -f package.json "$(PLUGINS_DIR)/obloop-package.json"; fi
+# ---------------------------------------------------------------------------
+# Local setup – makes `opencode` in this repo use the plugin + agents
+#
+# OpenCode scans plugins/*.{ts,js} (flat files only, not subdirectories).
+# We symlink plugin.ts directly as obloop.ts so Bun resolves its relative
+# imports from the actual file location (the repo root).
+#
+# - .opencode/agents/  already present in the repo (backward.md, forward.md)
+# - .opencode/skills/  already present in the repo (obloop, obloop-ack)
+# - .opencode/plugins/obloop.ts  → symlink to repo root plugin.ts
+# ---------------------------------------------------------------------------
 
-install-skills:
-	@mkdir -p "$(SKILLS_DIR)"
-	@cp -R .opencode/skills/obloop .opencode/skills/obloop-ack "$(SKILLS_DIR)/" 2>/dev/null || true
-	@echo "Skills copied to $(SKILLS_DIR)"
+setup: node_modules
+	@mkdir -p $(LOCAL_DIR)/plugins
+	@if [ -L "$(LOCAL_DIR)/plugins/obloop.ts" ]; then \
+		echo "plugin symlink already exists, skipping"; \
+	elif [ -e "$(LOCAL_DIR)/plugins/obloop.ts" ]; then \
+		echo "ERROR: $(LOCAL_DIR)/plugins/obloop.ts exists and is not a symlink – remove it first" >&2; exit 1; \
+	else \
+		ln -s $(REPO_ROOT)/plugin.ts $(LOCAL_DIR)/plugins/obloop.ts; \
+		echo "Created $(LOCAL_DIR)/plugins/obloop.ts -> $(REPO_ROOT)/plugin.ts"; \
+	fi
+	@# Clean up any old directory-style symlink from previous installs
+	@if [ -L "$(LOCAL_DIR)/plugins/obloop" ] || [ -d "$(LOCAL_DIR)/plugins/obloop" ]; then \
+		rm -rf "$(LOCAL_DIR)/plugins/obloop"; \
+		echo "Removed old directory-style plugin link"; \
+	fi
+	@echo "Local setup complete. Run 'opencode' in this directory to use obloop."
 
-uninstall: uninstall-plugin uninstall-skills
-	@echo "Uninstalled obloop"
+# ---------------------------------------------------------------------------
+# Global install – copies plugin source + entry file to the OS config dir
+#
+# OpenCode scans plugins/*.{ts,js}. We install:
+#   plugins/obloop.ts        – entry file (re-exports from ./obloop/src/plugin.js)
+#   plugins/obloop/src/      – source files (no node_modules needed; no runtime deps)
+# ---------------------------------------------------------------------------
 
-uninstall-plugin:
-	@rm -f "$(INSTALL_ENTRY)"
-	@rm -rf "$(INSTALL_SRC)"
-	@rm -f "$(PLUGINS_DIR)/obloop-package.json"
-	@echo "Removed $(INSTALL_ENTRY) and $(INSTALL_SRC)"
+PLUGIN_SRC_DEST := $(GLOBAL_DIR)/plugins/obloop
+PLUGIN_ENTRY    := $(GLOBAL_DIR)/plugins/obloop.ts
+AGENTS_DEST     := $(GLOBAL_DIR)/agents
+SKILLS_DEST     := $(GLOBAL_DIR)/skills
 
-uninstall-skills:
-	@rm -rf "$(SKILLS_DIR)/obloop" "$(SKILLS_DIR)/obloop-ack"
-	@echo "Removed obloop skills from $(SKILLS_DIR)"
+install: node_modules
+	@echo "Installing to $(GLOBAL_DIR) ..."
+	@# Plugin source – remove and re-copy so stale files don't accumulate
+	@rm -rf $(PLUGIN_SRC_DEST)
+	@mkdir -p $(PLUGIN_SRC_DEST)
+	@cp -r $(REPO_ROOT)/src $(PLUGIN_SRC_DEST)/
+	@# Entry file – re-exports from the source directory
+	@printf 'export { default } from "./obloop/src/plugin.js"\n' > $(PLUGIN_ENTRY)
+	@echo "  plugin  -> $(PLUGIN_SRC_DEST)/ + $(PLUGIN_ENTRY)"
+	@# Agents – merge into shared directory, overwrite our files only
+	@mkdir -p $(AGENTS_DEST)
+	@cp $(LOCAL_DIR)/agents/backward.md $(AGENTS_DEST)/
+	@cp $(LOCAL_DIR)/agents/forward.md  $(AGENTS_DEST)/
+	@echo "  agents  -> $(AGENTS_DEST)"
+	@# Skills – merge into shared directory, overwrite our subdirs only
+	@mkdir -p $(SKILLS_DEST)/obloop $(SKILLS_DEST)/obloop-ack
+	@cp $(LOCAL_DIR)/skills/obloop/SKILL.md     $(SKILLS_DEST)/obloop/
+	@cp $(LOCAL_DIR)/skills/obloop-ack/SKILL.md $(SKILLS_DEST)/obloop-ack/
+	@echo "  skills  -> $(SKILLS_DEST)"
+	@echo "Global install complete."
+
+# ---------------------------------------------------------------------------
+# Global uninstall – removes only what install placed; leaves everything else
+# ---------------------------------------------------------------------------
+
+uninstall:
+	@echo "Uninstalling from $(GLOBAL_DIR) ..."
+	@rm -rf  $(PLUGIN_SRC_DEST)
+	@rm -f   $(PLUGIN_ENTRY)
+	@echo "  removed $(PLUGIN_SRC_DEST) and $(PLUGIN_ENTRY)"
+	@rm -f   $(AGENTS_DEST)/backward.md $(AGENTS_DEST)/forward.md
+	@echo "  removed agents from $(AGENTS_DEST)"
+	@rm -rf  $(SKILLS_DEST)/obloop $(SKILLS_DEST)/obloop-ack
+	@echo "  removed skills from $(SKILLS_DEST)"
+	@echo "Global uninstall complete."
+
+# ---------------------------------------------------------------------------
+# Clean – removes the local plugin symlink (agents/skills stay; they're
+# tracked in the repo under .opencode/)
+# ---------------------------------------------------------------------------
+
+clean:
+	@rm -f $(LOCAL_DIR)/plugins/obloop.ts
+	@echo "Removed local plugin symlink."

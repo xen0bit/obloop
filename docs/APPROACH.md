@@ -2,9 +2,9 @@
 
 ## Goal
 
-Run a **sequence of OpenCode sessions**, each with a different agent (e.g. chaos → developer), where:
+Run a **sequence of OpenCode sessions**, each with a different agent (e.g. backward → forward), where:
 
-1. Each session is **fresh**: no parent, no prior context. Chaos and developer have **no visibility** to any parent or previous session; they maintain their **own** state. Obloop does **not** preserve or pass state.
+1. Each session is **fresh**: no parent, no prior context. Backward and forward have **no visibility** to any parent or previous session; they maintain their **own** state. Obloop does **not** preserve or pass state.
 2. When one agent’s session finishes, the next agent’s session starts in the **same** OpenCode instance. Agent output **streams directly** to the interface.
 3. Agents and prompt are **configurable**.
 4. Triggered by a **slash command** (e.g. `/obloop`) in the TUI, with a single view of sessions starting and stopping.
@@ -38,20 +38,20 @@ Obloop does **not** preserve or pass state; each agent maintains its own state. 
 
 ### 3. Configuration
 
-- **Agents:** list of agent IDs, e.g. `["chaos", "developer"]`.
+- **Agents:** list of agent IDs, e.g. `["backward", "forward"]`.
 - **Prompt:** prompt sent to each agent (configurable; can be overridden via `/obloop "..."`).
-- **No obloop state:** Obloop does not preserve or pass state. Chaos and developer maintain their own state and always start fresh.
+- **No obloop state:** Obloop does not preserve or pass state. Backward and forward maintain their own state and always start fresh.
 
 Config can live in:
 
-- `opencode.json`: `"obloop": { "agents": ["chaos", "developer"], "prompt": "..." }`, or
+- `opencode.json`: `"obloop": { "agents": ["backward", "forward"], "prompt": "..." }`, or
 - `.obloop/config.json` in the project.
 
 ### 4. Single view and streaming
 
 - Because we use `client.session.create` and `client.session.prompt` on the **existing** server, every new session is in the same OpenCode instance.
 - Agent output **streams directly** to the interface (same as any normal OpenCode session). The user can switch to the new session to watch it live.
-- Optional: use **toasts** (`client.tui.showToast`) when each agent’s session starts/ends so the user gets a clear “chaos done → developer started” signal.
+- Optional: use **toasts** (`client.tui.showToast`) when each agent’s session starts/ends so the user gets a clear “backward done → forward started” signal.
 
 ## Implementation outline
 
@@ -74,4 +74,4 @@ Config can live in:
 - **Plugin:** OpenCode plugin (single TS file or small module) with `tool.execute.before` and optional custom tool.
 - **Config:** `opencode.json` and/or `.obloop/config.json`. No obloop-managed state; agents maintain their own state.
 
-This gives you a clean way to run “chaos then developer then …” as separate, **fresh** sessions in one view, triggered by `/obloop`, with configurable agents and prompt. Output streams directly to the interface.
+This gives you a clean way to run “backward then forward then …” as separate, **fresh** sessions in one view, triggered by `/obloop`, with configurable agents and prompt. Output streams directly to the interface.

@@ -57,8 +57,8 @@ export function normalizeLoop(raw: RawLoopConfig | undefined): LoopConfig {
     stop_phrase:
       typeof raw?.stop_phrase === "string" ? raw.stop_phrase : "",
     stop_mode:
-      STOP_MODES.includes((raw?.stop_mode as StopMode) ?? "suffix")
-        ? ((raw?.stop_mode as StopMode) ?? "suffix")
+      STOP_MODES.includes(raw?.stop_mode as StopMode)
+        ? (raw?.stop_mode as StopMode)
         : "suffix",
     delay_ms: parseDuration(raw?.delay),
   }
