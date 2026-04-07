@@ -11,6 +11,32 @@ Inspired by [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent)�
 
 ## Install
 
+### Docker (Recommended for LLM Agents)
+
+```sh
+make docker-build
+```
+
+Run the container with environment variable configuration:
+
+```sh
+podman run -it --rm \
+  -e OBLOOP_AGENTS="backward,forward" \
+  -e OBLOOP_MAX_STEPS="100" \
+  -e OBLOOP_TIMEOUT="60m" \
+  -e OBLOOP_STOP_PHRASE="<promise>DONE</promise>" \
+  obloop:latest
+```
+
+The Docker image includes:
+- All development tools and LSP servers for OpenCode
+- Pre-installed obloop plugin with backward/forward agents
+- Configurable via environment variables (see Configuration section)
+- User `user` with passwordless sudo access
+
+See [Dockerfile](Dockerfile) for the complete list of included tools.
+
+
 ### Local (project-scoped)
 
 ```sh
@@ -45,6 +71,67 @@ make build       # type-check the source
    - For global use, copy the same into `~/.config/opencode/skills/`.
 
 3. (Optional) Add a `package.json` in the plugin directory if you use extra deps; OpenCode uses Bun to install.
+
+## Docker Usage
+
+The `obloop:latest` Docker image provides a complete development environment with obloop pre-configured.
+
+### Building
+
+```sh
+make docker-build    # Build the image (uses podman or docker)
+```
+
+### Running
+
+```sh
+make docker-run      # Run interactively
+make docker-clean    # Remove the image
+```
+
+### Configuration via Environment Variables
+
+```sh
+podman run -it --rm \
+  -e OBLOOP_AGENTS="backward,forward" \
+  -e OBLOOP_PROMPT="Execute your current task." \
+  -e OBLOOP_MAX_STEPS="50" \
+  -e OBLOOP_TIMEOUT="30m" \
+  -e OBLOOP_STOP_PHRASE="<promise>DONE</promise>" \
+  -e OBLOOP_STOP_MODE="suffix" \
+  -e OBLOOP_DELAY="5s" \
+  obloop:latest
+```
+
+### Included Tools
+
+The Docker image (based on Ubuntu 25.10) includes:
+
+**Languages & Runtimes:**
+- Bun 1.3.11
+- Node.js 22.x
+- Go 1.23.6
+- Rust 1.94.1 (with cargo)
+- PHP 8.4 + Composer
+- Python 3 + uv
+- Java 21 (for JDTLS)
+- Lua 5.4 + Lua Language Server
+
+**LSP Servers:**
+- TypeScript, ESLint, Prettier
+- bash-language-server
+- yaml-language-server
+- dockerfile-language-server
+- vscode-langservers-extracted
+- markdownlint-cli
+
+**Development Tools:**
+- vim, nano, git, tmux, screen
+- build-essential, cmake, make
+- htop, strace, jq, sqlite3
+- curl, wget, netcat, ssh, rsync
+
+See [Dockerfile](Dockerfile) for the complete list.
 
 ## Configuration
 
@@ -94,9 +181,44 @@ Configure agents and the prompt sent to each in either:
 |--------|-------------|---------|
 | `max_steps` | Stop after this many agent runs (one run = one session). | `100` |
 | `timeout` | Stop after this duration. Use `"60m"`, `"5s"`, `"1h"`. | `"60m"` |
-| `stop_phrase` | When the assistant’s reply matches this, the loop stops successfully. | `""` (disabled) |
+| `stop_phrase` | When the assistant's reply matches this, the loop stops successfully. | `""` (disabled) |
 | `stop_mode` | How to match `stop_phrase`: `"exact"` (whole reply), `"contains"`, `"suffix"` (recommended). | `"suffix"` |
 | `delay` | Wait time between iterations (e.g. `"5s"`). | no delay |
+
+**Option C – Environment variables (Docker/CI):**
+
+Environment variables take **precedence** over JSON config files. Useful for Docker containers or CI/CD pipelines.
+
+```sh
+# Agents (comma-separated)
+export OBLOOP_AGENTS="backward,forward"
+
+# Prompt
+export OBLOOP_PROMPT="Execute your current task."
+
+# Loop options
+export OBLOOP_MAX_STEPS="100"
+export OBLOOP_TIMEOUT="60m"
+export OBLOOP_STOP_PHRASE="<promise>DONE</promise>"
+export OBLOOP_STOP_MODE="suffix"
+export OBLOOP_DELAY="5s"
+```
+
+| Env Variable | Description | Example |
+|--------------|-------------|---------|
+| `OBLOOP_AGENTS` | Comma-separated agent list | `"backward,forward"` |
+| `OBLOOP_PROMPT` | Prompt string | `"Execute your task"` |
+| `OBLOOP_MAX_STEPS` | Max iterations (number) | `"100"` |
+| `OBLOOP_TIMEOUT` | Timeout duration | `"60m"`, `"5s"`, `"1h"` |
+| `OBLOOP_STOP_PHRASE` | Stop phrase | `"<promise>DONE</promise>"` |
+| `OBLOOP_STOP_MODE` | Match mode | `"exact"`, `"contains"`, `"suffix"` |
+| `OBLOOP_DELAY` | Delay between iterations | `"5s"`, `"1m"` |
+
+**Configuration Priority:**
+
+1. **Environment variables** (highest priority)
+2. `opencode.json` or `.obloop/config.json`
+3. **Default values** (lowest priority)
 
 ## Usage
 

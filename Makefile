@@ -11,7 +11,12 @@ endif
 REPO_ROOT  := $(CURDIR)
 LOCAL_DIR  := $(REPO_ROOT)/.opencode
 
-.PHONY: all setup build test install uninstall clean
+# Docker/runtime detection
+RUNTIME := $(shell if command -v podman >/dev/null 2>&1; then echo podman; elif command -v docker >/dev/null 2>&1; then echo docker; else echo ""; fi)
+IMAGE_NAME := obloop:latest
+CONTAINER_NAME := obloop
+
+.PHONY: all setup build test install uninstall clean docker-build docker-run docker-clean
 
 all: setup
 
@@ -122,3 +127,33 @@ uninstall:
 clean:
 	@rm -f $(LOCAL_DIR)/plugins/obloop.ts
 	@echo "Removed local plugin symlink."
+
+# ---------------------------------------------------------------------------
+# Docker targets – uses podman if available, falls back to docker
+# ---------------------------------------------------------------------------
+
+docker-build:
+ifeq ($(RUNTIME),)
+	@echo "ERROR: Neither podman nor docker found" >&2; exit 1
+else
+	@echo "Using $(RUNTIME) to build $(IMAGE_NAME)..."
+	$(RUNTIME) build -t $(IMAGE_NAME) .
+	@echo "Build complete: $(IMAGE_NAME)"
+endif
+
+docker-run:
+ifeq ($(RUNTIME),)
+	@echo "ERROR: Neither podman nor docker found" >&2; exit 1
+else
+	@echo "Running $(IMAGE_NAME) with $(RUNTIME)..."
+	$(RUNTIME) run -it --rm $(IMAGE_NAME)
+endif
+
+docker-clean:
+ifeq ($(RUNTIME),)
+	@echo "ERROR: Neither podman nor docker found" >&2; exit 1
+else
+	@echo "Removing $(IMAGE_NAME) with $(RUNTIME)..."
+	$(RUNTIME) rmi $(IMAGE_NAME) 2>/dev/null || $(RUNTIME) image rm $(IMAGE_NAME) 2>/dev/null || true
+	@echo "Image removed."
+endif
