@@ -11,6 +11,12 @@ import {
   type StopMode,
 } from "./constants.js"
 
+/** Parse comma-separated agents from env var */
+function parseAgentsFromEnv(envValue: string | undefined): string[] | undefined {
+  if (!envValue || envValue.trim() === "") return undefined
+  return envValue.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+}
+
 export type LoopConfig = {
   max_steps: number
   timeout_ms: number
@@ -75,7 +81,60 @@ function parseJsonSafe<T>(path: string, fallback: T): T {
 }
 
 /**
- * Load obloop config: opencode.json "obloop" key first, then .obloop/config.json.
+ * Load obloop config from environment variables.
+ * Env vars take precedence over JSON config files.
+ *
+ * Supported env vars:
+ * - OBLOOP_AGENTS: comma-separated list (e.g., "backward,forward")
+ * - OBLOOP_PROMPT: prompt string
+ * - OBLOOP_MAX_STEPS: number
+ * - OBLOOP_TIMEOUT: duration string (e.g., "60m", "5s")
+ * - OBLOOP_STOP_PHRASE: string
+ * - OBLOOP_STOP_MODE: "exact", "contains", or "suffix"
+ * - OBLOOP_DELAY: duration string (e.g., "5s")
+ */
+function loadConfigFromEnv(): { agents?: string[]; prompt?: string; loop?: RawLoopConfig } {
+  const env = process.env
+  const result: { agents?: string[]; prompt?: string; loop?: RawLoopConfig } = {}
+
+  const agents = parseAgentsFromEnv(env.OBLOOP_AGENTS)
+  if (agents && agents.length > 0) {
+    result.agents = agents
+  }
+
+  if (env.OBLOOP_PROMPT && env.OBLOOP_PROMPT.trim() !== "") {
+    result.prompt = env.OBLOOP_PROMPT
+  }
+
+  const loop: RawLoopConfig = {}
+  if (env.OBLOOP_MAX_STEPS) {
+    const steps = Number.parseInt(env.OBLOOP_MAX_STEPS, 10)
+    if (!Number.isNaN(steps) && steps > 0) {
+      loop.max_steps = steps
+    }
+  }
+  if (env.OBLOOP_TIMEOUT) {
+    loop.timeout = env.OBLOOP_TIMEOUT
+  }
+  if (env.OBLOOP_STOP_PHRASE) {
+    loop.stop_phrase = env.OBLOOP_STOP_PHRASE
+  }
+  if (env.OBLOOP_STOP_MODE && STOP_MODES.includes(env.OBLOOP_STOP_MODE as StopMode)) {
+    loop.stop_mode = env.OBLOOP_STOP_MODE as StopMode
+  }
+  if (env.OBLOOP_DELAY) {
+    loop.delay = env.OBLOOP_DELAY
+  }
+
+  if (Object.keys(loop).length > 0) {
+    result.loop = loop as RawLoopConfig
+  }
+
+  return result
+}
+
+/**
+ * Load obloop config with priority: env vars > opencode.json > .obloop/config.json > defaults.
  */
 export function loadObloopConfig(directory: string): ObloopConfig {
   const opencodePath = join(directory, "opencode.json")
@@ -97,14 +156,25 @@ export function loadObloopConfig(directory: string): ObloopConfig {
   const fromObloopDir = parseJsonSafe<
     Partial<{ agents: string[]; prompt: string }> & { loop?: RawLoopConfig }
   >(obloopConfigPath, {})
+  const fileAgents = Array.isArray(fromObloopDir.agents)
+    ? fromObloopDir.agents
+    : DEFAULT_AGENTS
+  const filePrompt = typeof fromObloopDir.prompt === "string"
+    ? fromObloopDir.prompt
+    : DEFAULT_PROMPT
+  const fileLoop = normalizeLoop(fromObloopDir.loop)
+
+  const envConfig = loadConfigFromEnv()
+  const mergedLoop: RawLoopConfig = {
+    max_steps: envConfig.loop?.max_steps ?? fileLoop.max_steps,
+    timeout: envConfig.loop?.timeout ?? `${fileLoop.timeout_ms / 1000 / 60}m`,
+    stop_phrase: envConfig.loop?.stop_phrase ?? fileLoop.stop_phrase,
+    stop_mode: envConfig.loop?.stop_mode ?? fileLoop.stop_mode,
+    delay: envConfig.loop?.delay ?? `${fileLoop.delay_ms / 1000}s`,
+  }
   return {
-    agents: Array.isArray(fromObloopDir.agents)
-      ? fromObloopDir.agents
-      : DEFAULT_AGENTS,
-    prompt:
-      typeof fromObloopDir.prompt === "string"
-        ? fromObloopDir.prompt
-        : DEFAULT_PROMPT,
-    loop: normalizeLoop(fromObloopDir.loop),
+    agents: envConfig.agents ?? fileAgents,
+    prompt: envConfig.prompt ?? filePrompt,
+    loop: normalizeLoop(mergedLoop),
   }
 }

@@ -109,6 +109,15 @@ RUN npm install -g markdownlint-cli markdownlint-cli2
 # Set up paths
 ENV PATH="/home/user/.local/bin:/home/user/.bun/bin:/home/user/go/bin:/usr/local/go/bin:$PATH"
 
+# Obloop configuration via environment variables (optional - override defaults)
+# ENV OBLOOP_AGENTS="backward,forward"
+# ENV OBLOOP_PROMPT="Execute your current task."
+# ENV OBLOOP_MAX_STEPS="100"
+# ENV OBLOOP_TIMEOUT="60m"
+# ENV OBLOOP_STOP_PHRASE="<promise>DONE</promise>"
+# ENV OBLOOP_STOP_MODE="suffix"
+# ENV OBLOOP_DELAY="5s"
+
 # Copy obloop source
 WORKDIR /home/user/workspace/obloop
 COPY --chown=user:user package.json bun.lock* ./
