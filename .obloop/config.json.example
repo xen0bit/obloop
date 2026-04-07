@@ -1,5 +1,5 @@
 {
-  "agents": ["chaos", "developer"],
+  "agents": ["backward", "forward"],
   "prompt": "Execute your current task.",
   "loop": {
     "max_steps": 20,
