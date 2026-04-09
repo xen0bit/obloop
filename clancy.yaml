@@ -1,0 +1,23 @@
+# https://github.com/eduardolat/clancy
+
+version: 1
+
+agent:
+  # The command to run. ${PROMPT} is replaced with the content from input.prompt.
+  # Note: Ensure usage of quotes compatible with your shell.
+  command: "opencode run --dangerously-skip-permissions --agent backward 'Read state and execute one iteration.' && opencode run --dangerously-skip-permissions --agent forward 'Read state and execute one iteration.'"
+  env:
+    # Optional environment variables
+    FOO: "bar"
+
+loop:
+  max_steps: 25 # Stop after 50 iterations (increased for full implementation)
+  timeout: "24h" # Stop after 24 hours
+  stop_phrase: "<promise>DONE</promise>" # The success signal
+  stop_mode: "contains" # Options: "exact", "contains", "suffix" (Recommended)
+  delay: "5s" # Wait time between iterations
+
+input:
+  # task.md contains the user-supplied task specification
+  # The agent reads this along with its state and loop.md
+  prompt: "file:./task.md"

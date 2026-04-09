@@ -51,6 +51,11 @@ RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz -O /tmp/go.tar.
     rm /tmp/go.tar.gz && \
     chown -R user:user /usr/local/go
 
+# Install clancy
+USER user
+RUN go install github.com/eduardolat/clancy/cmd/clancy@latest
+USER root
+
 # Install Bun for user
 USER user
 RUN curl -fsSL https://bun.sh/install | bash
@@ -121,6 +126,9 @@ ENV PATH="/home/user/.local/bin:/home/user/.bun/bin:/home/user/go/bin:/usr/local
 # Copy obloop source
 WORKDIR /home/user/workspace/obloop
 COPY --chown=user:user package.json bun.lock* ./
+
+# Fix ownership so user can write to the workspace
+RUN chown -R user:user /home/user
 
 # Install obloop dependencies
 USER user
